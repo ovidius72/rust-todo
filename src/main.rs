@@ -1,12 +1,10 @@
-// TODO-LIST
-
+use chrono::{NaiveDate, Utc};
 use clearscreen;
 use std::{
     io::{self, stdout, Write},
     time,
 };
 use uuid::Uuid;
-use chrono::{DateTime, Local, NaiveDate}
 
 #[derive(Debug)]
 struct TodoItem {
@@ -15,7 +13,40 @@ struct TodoItem {
     description: String,
     title: String,
     created_at: time::SystemTime,
+    completed_at: Option<NaiveDate>,
     expires_at: Option<NaiveDate>,
+}
+
+impl TodoItem {
+    fn new(title: String, description: String, expires_at: Option<NaiveDate>) -> TodoItem {
+        println!("expires_at {:?}", expires_at);
+        TodoItem {
+            id: Uuid::new_v4(),
+            done: false,
+            description: description.to_string(),
+            title: title.to_string(),
+            created_at: time::SystemTime::now(),
+            completed_at: None,
+            expires_at,
+        }
+    }
+
+    fn set_completed(&mut self, value: bool) {
+        self.done = value;
+        if value {
+            self.completed_at = Some(Utc::now().date_naive());
+        } else {
+            self.completed_at = None;
+        }
+    }
+
+    fn toggle_completed(&mut self) {
+        if self.done {
+            self.set_completed(false)
+        } else {
+            self.set_completed(true)
+        }
+    }
 }
 
 fn print_menu() {
@@ -30,7 +61,6 @@ fn print_menu() {
 
 fn add_todo_item() -> TodoItem {
     println!("Enter the title of the todo item: ");
-    let id = Uuid::new_v4();
     let mut title = String::new();
     io::stdin()
         .read_line(&mut title)
@@ -46,19 +76,19 @@ fn add_todo_item() -> TodoItem {
         .read_line(&mut expires_at)
         .expect("Failed to read line");
 
-    TodoItem {
-        id,
-        done: false,
-        title: title.trim().to_string(),
-        description: description.trim().to_string(),
-        created_at: time::SystemTime::now(),
-        expires_at: NaiveDate::parse_from_str(&expires_at.trim().to_string(), "%Y-%m-%d"),
-    }
+    let expiration_date =
+        NaiveDate::parse_from_str(&expires_at.trim().to_string(), "%Y-%m-%d").ok();
+    TodoItem::new(
+        title.trim().to_string(),
+        description.trim().to_string(),
+        expiration_date,
+    )
 }
 
 fn clear_screen() {
     clearscreen::clear().expect("Failed to clear screen");
 }
+
 fn ask_for_input(message: &str) -> String {
     print!("{}", message);
     stdout().flush().unwrap();
@@ -122,13 +152,14 @@ fn main() {
                     println!("No items found");
                 }
                 items.iter().enumerate().for_each(|(idx, item)| {
+                    let date = match item.expires_at.is_some() {
+                        true => item.expires_at.unwrap().format("%d-%m-%Y").to_string(),
+                        false => "No expiration date".to_string(),
+                    };
+
                     println!(
-                        "#{} | [{}] | {} | {}",
-                        idx,
-                        item.title,
-                        item.description,
-                        item.date_time
-                        .
+                        "#{} | [{}] | {} | {:?}",
+                        idx, item.title, item.description, date,
                     );
                 });
                 println!("");
